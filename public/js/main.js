@@ -1,14 +1,24 @@
 var twitterStream = angular.module('myApp', ['chart.js'])
+var aapl = ['aapl'];
+var aaplEMA15 = ['ema 15'];
+var aaplEMA60 = ['ema 60'];
+var multiplier15 = (2 / (15 + 1));
+var multiplier60 = (2 / (60 + 1));
+var chart = c3.generate({
+  bindto: '#chart1',
+  data: {
+    columns: [aapl]
+  },
+})
+// setTimeout(function () {
+//   chart.load({
+//     columns: [aapl, aaplEMA15, aaplEMA60]
+//   })
+// }, 100);
+
 
 twitterStream.controller("mainCtrl", ['$scope', 'socket',
 function ($scope, socket) {
-  //chart labels
-  $scope.labels = ["iPhone", "iPad", "Android", "Web Client", "Other"];
-  //chart colors
-  $scope.colors = ['#6c6a6c','#000000','#7FFD1F','#EC872A', '#9527C2'];
-  //intial data values
-  $scope.trumpData = [0,0,0,0,0];
-  $scope.sandersData = [0,0,0,0,0];
 
   socket.on('newTweet', function (tweet) {
     $scope.tweet = tweet.text
@@ -19,36 +29,23 @@ function ($scope, socket) {
     var hashtags = tweet.entities.hashtags.map(function(el){
       return el.text.toLowerCase()
     })
-
-    //check source and increment for #trump tweets
-    if (hashtags.indexOf('trump') !== -1){
-      switch (source) {
-        case 'iPhone': $scope.trumpData[0]++
-        break;
-        case 'iPad': $scope.trumpData[1]++
-        break;
-        case 'Android': $scope.trumpData[2]++
-        break;
-        case 'Web': $scope.trumpData[3]++
-        break;
-        default: $scope.trumpData[4]++
+    $.ajax({
+      url: '/analyze?tweet=' + tweet.text
+    })
+    .done(function(result) {
+      aapl.push(result.score);
+      if (aaplEMA15.length != 1) {
+        var previousEma15 = aaplEMA15[aaplEMA15.length - 1] || 0;
+        var previousEma60 = aaplEMA60[aaplEMA15.length - 1] || 0;
+        aaplEMA15.push((result.score - previousEma15) * multiplier15 + previousEma15);
+        aaplEMA60.push((result.score - previousEma60) * multiplier60 + previousEma60);
+      } else {
+        aaplEMA15.push(result.score);
       }
-    }
-
-    //check source and increment for #feelthebern tweets
-    else if (hashtags.indexOf('feelthebern') !== -1) {
-      switch (source) {
-        case 'iPhone': $scope.sandersData[0]++
-        break;
-        case 'iPad': $scope.sandersData[1]++
-        break;
-        case 'Android': $scope.sandersData[2]++
-        break;
-        case 'Web': $scope.sandersData[3]++
-        break;
-        default: $scope.sandersData[4]++
-      }
-    }
+      chart.load({
+        columns: [aapl, aaplEMA15, aaplEMA60]
+      })
+    })
   });
 }
 ]);
